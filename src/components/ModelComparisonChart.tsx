@@ -1,6 +1,6 @@
 
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart,
   Bar,
@@ -8,94 +8,93 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  LabelList,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from "recharts";
-import { modelMetrics } from "@/utils/mlModels";
-
-type MetricType = "mae" | "rmse" | "r2" | "cvR2Mean";
+import { modelMetrics } from '@/utils/mlModels';
 
 interface ModelComparisonChartProps {
-  className?: string;
-  metric?: MetricType;
+  metric: 'r2' | 'mae' | 'rmse' | 'cvR2Mean';
 }
 
-const ModelComparisonChart: React.FC<ModelComparisonChartProps> = ({ 
-  className,
-  metric = "r2" 
-}) => {
+const ModelComparisonChart: React.FC<ModelComparisonChartProps> = ({ metric }) => {
   const metricLabels = {
-    mae: "Mean Absolute Error (MAE)",
-    rmse: "Root Mean Square Error (RMSE)",
-    r2: "R² Score",
-    cvR2Mean: "Cross-Validation R²"
+    r2: 'R² Score',
+    mae: 'Mean Absolute Error',
+    rmse: 'Root Mean Squared Error',
+    cvR2Mean: 'Cross-Validation R² Mean'
   };
 
-  const sortedModels = [...modelMetrics.models].sort((a, b) => {
-    if (metric === 'mae' || metric === 'rmse') {
-      return a[metric] - b[metric]; // Lower is better for error metrics
+  const metricKeys = {
+    r2: 'r2',
+    mae: 'mae',
+    rmse: 'rmse',
+    cvR2Mean: 'cvR2Mean'
+  };
+
+  // Format the data for the chart
+  const chartData = modelMetrics.models.map(model => ({
+    name: model.name,
+    value: model[metricKeys[metric]],
+    color: model.color
+  }));
+
+  // Sort the models
+  const sortedData = [...chartData].sort((a, b) => {
+    // For R2 and CV R2, higher is better
+    if (metric === 'r2' || metric === 'cvR2Mean') {
+      return b.value - a.value;
     }
-    return b[metric] - a[metric]; // Higher is better for R² metrics
+    // For MAE and RMSE, lower is better
+    return a.value - b.value;
   });
 
-  const formatValue = (value: number) => {
-    if (value < 1) {
-      return value.toFixed(2);
-    }
-    return value.toFixed(1);
-  };
-
-  const getBestModel = () => {
-    if (metric === 'mae' || metric === 'rmse') {
-      return sortedModels[0].name;
-    }
-    return sortedModels[0].name;
-  };
+  // Get the best model for this metric
+  const bestModel = sortedData[0]?.name || "None";
 
   return (
-    <Card className={className}>
+    <Card>
       <CardHeader>
-        <CardTitle>Model Comparison: {metricLabels[metric]}</CardTitle>
-        <CardDescription>
-          Best performing model: <strong>{getBestModel()}</strong>
-        </CardDescription>
+        <CardTitle className="flex justify-between items-center">
+          <span>Model Performance: {metricLabels[metric]}</span>
+          <span className="text-sm font-normal text-muted-foreground">
+            Best: <span className="font-semibold text-primary">{bestModel}</span>
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={sortedModels}
-              layout="vertical"
-              margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-              <XAxis 
-                type="number" 
-                domain={metric === 'r2' || metric === 'cvR2Mean' ? [0, 1] : ['auto', 'auto']}
-              />
-              <YAxis 
-                type="category" 
-                dataKey="name" 
-                interval={0}
-              />
-              <Tooltip 
-                formatter={(value: number) => [formatValue(value), metricLabels[metric]]} 
-                labelFormatter={(name) => `Model: ${name}`}
-              />
-              <Bar 
-                dataKey={metric} 
-                fill={(entry) => entry.color as string} // Fix the type issue here
-                maxBarSize={40}
-              >
-                <LabelList 
-                  dataKey={metric} 
-                  position="right" 
-                  formatter={(value: number) => formatValue(value)} 
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart
+            data={sortedData}
+            margin={{
+              top: 20,
+              right: 30,
+              left: 20,
+              bottom: 70,
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45} 
+              textAnchor="end" 
+              height={70} 
+              tick={{ fontSize: 12 }}
+            />
+            <YAxis />
+            <Tooltip 
+              formatter={(value: number) => value.toFixed(4)}
+              labelFormatter={(name) => `Model: ${name}`}
+            />
+            <Bar 
+              dataKey="value" 
+              name={metricLabels[metric]}
+              fill="#1e5c97"
+              radius={[4, 4, 0, 0]}
+              // Fix: Use a function that returns a string instead of a function itself
+              fill={(entry) => entry.color}
+            />
+          </BarChart>
+        </ResponsiveContainer>
       </CardContent>
     </Card>
   );
