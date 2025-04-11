@@ -1,15 +1,20 @@
 
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeftRight, BarChart3, TrendingUp, MapPin } from "lucide-react";
+import ModelComparisonChart from "@/components/ModelComparisonChart";
+import { modelMetrics } from "@/utils/mlModels";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -21,398 +26,206 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
+  Scatter,
+  ScatterChart,
+  ZAxis
 } from "recharts";
-import { cn } from "@/lib/utils";
 
 const Comparison: React.FC = () => {
-  const [location1, setLocation1] = useState<string>("Whitefield");
-  const [location2, setLocation2] = useState<string>("Electronic City");
-  const [comparisonType, setComparisonType] = useState<string>("location");
+  const [metric, setMetric] = useState<'mae' | 'rmse' | 'r2' | 'cvR2Mean'>('r2');
   
-  const locationData = {
-    "Whitefield": {
-      avgPrice: 6800,
-      priceRange: "6,500 - 7,200",
-      growth: 12.5,
-      connectivity: 75,
-      amenities: 80,
-      schools: 70,
-      hospitals: 65,
-      retail: 80
-    },
-    "Electronic City": {
-      avgPrice: 5500,
-      priceRange: "5,200 - 5,900",
-      growth: 8.2,
-      connectivity: 70,
-      amenities: 75,
-      schools: 65,
-      hospitals: 60,
-      retail: 75
-    },
-    "Indiranagar": {
-      avgPrice: 12500,
-      priceRange: "11,800 - 13,500",
-      growth: 9.8,
-      connectivity: 95,
-      amenities: 95,
-      schools: 85,
-      hospitals: 90,
-      retail: 95
-    },
-    "Koramangala": {
-      avgPrice: 13200,
-      priceRange: "12,500 - 14,000",
-      growth: 10.2,
-      connectivity: 90,
-      amenities: 95,
-      schools: 90,
-      hospitals: 85,
-      retail: 95
-    },
-    "HSR Layout": {
-      avgPrice: 10500,
-      priceRange: "9,800 - 11,200",
-      growth: 11.5,
-      connectivity: 85,
-      amenities: 90,
-      schools: 85,
-      hospitals: 80,
-      retail: 90
-    },
-    "Jayanagar": {
-      avgPrice: 9800,
-      priceRange: "9,200 - 10,500",
-      growth: 7.5,
-      connectivity: 80,
-      amenities: 85,
-      schools: 90,
-      hospitals: 85,
-      retail: 85
-    },
-    "Marathahalli": {
-      avgPrice: 7200,
-      priceRange: "6,800 - 7,600",
-      growth: 9.0,
-      connectivity: 75,
-      amenities: 70,
-      schools: 65,
-      hospitals: 60,
-      retail: 75
-    }
+  const formatValue = (value: number) => {
+    return value < 1 ? value.toFixed(3) : value.toFixed(2);
+  };
+
+  const mapMetricsForRadarChart = () => {
+    const metrics = ["mae", "rmse", "r2", "cvR2Mean"];
+    
+    // Normalize values between 0-1 for radar chart
+    // For MAE/RMSE, lower is better so we invert the scale
+    const maxMae = Math.max(...modelMetrics.models.map(m => m.mae));
+    const maxRmse = Math.max(...modelMetrics.models.map(m => m.rmse));
+    
+    return modelMetrics.models.map(model => ({
+      name: model.name,
+      MAE: 1 - (model.mae / maxMae), // Invert so higher is better
+      RMSE: 1 - (model.rmse / maxRmse), // Invert so higher is better
+      "R²": model.r2,
+      "CV R²": model.cvR2Mean,
+      color: model.color
+    }));
   };
   
-  const propertyTypeData = {
-    "Apartment": {
-      avgPrice: 6800,
-      priceRange: "5,500 - 8,200",
-      growth: 8.5,
-      demand: 85,
-      supply: 80,
-      roi: 5.2,
-      maintenance: "Medium"
-    },
-    "Villa": {
-      avgPrice: 9500,
-      priceRange: "8,200 - 12,500",
-      growth: 7.2,
-      demand: 65,
-      supply: 40,
-      roi: 4.5,
-      maintenance: "High"
-    },
-    "Independent House": {
-      avgPrice: 8200,
-      priceRange: "7,000 - 9,500",
-      growth: 6.8,
-      demand: 70,
-      supply: 50,
-      roi: 4.8,
-      maintenance: "High"
-    },
-    "Builder Floor": {
-      avgPrice: 7500,
-      priceRange: "6,800 - 8,200",
-      growth: 7.5,
-      demand: 75,
-      supply: 60,
-      roi: 5.0,
-      maintenance: "Medium"
-    },
-    "Plot": {
-      avgPrice: 5500,
-      priceRange: "4,500 - 7,000",
-      growth: 12.5,
-      demand: 60,
-      supply: 45,
-      roi: 8.5,
-      maintenance: "Low"
-    }
+  const radarData = mapMetricsForRadarChart();
+  
+  const getScatterData = () => {
+    // Create data for RMSE vs R² scatter plot
+    return modelMetrics.models.map(model => ({
+      name: model.name,
+      rmse: model.rmse,
+      r2: model.r2,
+      mae: model.mae,
+      color: model.color,
+      size: 20
+    }));
   };
-  
-  const getComparisonItems = () => {
-    if (comparisonType === "location") {
-      return Object.keys(locationData);
-    } else {
-      return Object.keys(propertyTypeData);
-    }
-  };
-  
-  const getComparisonData = (item1: string, item2: string) => {
-    if (comparisonType === "location") {
-      const loc1 = locationData[item1 as keyof typeof locationData];
-      const loc2 = locationData[item2 as keyof typeof locationData];
-      
-      return {
-        price: [
-          { name: item1, value: loc1.avgPrice },
-          { name: item2, value: loc2.avgPrice }
-        ],
-        growth: [
-          { name: item1, value: loc1.growth },
-          { name: item2, value: loc2.growth }
-        ],
-        radar: [
-          {
-            subject: "Connectivity",
-            [item1]: loc1.connectivity,
-            [item2]: loc2.connectivity
-          },
-          {
-            subject: "Amenities",
-            [item1]: loc1.amenities,
-            [item2]: loc2.amenities
-          },
-          {
-            subject: "Schools",
-            [item1]: loc1.schools,
-            [item2]: loc2.schools
-          },
-          {
-            subject: "Hospitals",
-            [item1]: loc1.hospitals,
-            [item2]: loc2.hospitals
-          },
-          {
-            subject: "Retail",
-            [item1]: loc1.retail,
-            [item2]: loc2.retail
-          }
-        ]
-      };
-    } else {
-      // Property type comparison
-      return {};
-    }
-  };
-  
-  const data = getComparisonData(location1, location2);
-  
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Area Comparison</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Model Comparison</h1>
         <p className="text-muted-foreground">
-          Compare different areas in Bangalore to make informed decisions
+          Compare performance metrics of different machine learning models
         </p>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ArrowLeftRight className="h-5 w-5 text-realestate-accent" />
-            Select Areas to Compare
-          </CardTitle>
-          <CardDescription>
-            Choose two areas to see a detailed comparison
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="location" className="w-full" onValueChange={(value) => setComparisonType(value)}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="location">Compare Locations</TabsTrigger>
-              <TabsTrigger value="property">Compare Property Types</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="location" className="space-y-4 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <MapPin className="h-4 w-4 mr-2 text-realestate-primary" />
-                    <label htmlFor="location-1" className="text-sm font-medium">Location 1</label>
-                  </div>
-                  <Select value={location1} onValueChange={setLocation1}>
-                    <SelectTrigger id="location-1">
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getComparisonItems().map((item) => (
-                        <SelectItem key={item} value={item}>{item}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <MapPin className="h-4 w-4 mr-2 text-realestate-primary" />
-                    <label htmlFor="location-2" className="text-sm font-medium">Location 2</label>
-                  </div>
-                  <Select value={location2} onValueChange={setLocation2}>
-                    <SelectTrigger id="location-2">
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getComparisonItems().map((item) => (
-                        <SelectItem key={item} value={item}>{item}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              {location1 && location2 && location1 !== location2 && (
-                <div className="pt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <Card className={cn("lg:col-span-3")}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-md font-medium flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4 text-realestate-accent" />
-                        Average Price Comparison (₹/sq.ft)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="chart-container h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={data.price}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip formatter={(value) => [`₹${value}/sq.ft`, "Price"]} />
-                            <Bar dataKey="value" fill="#1e5c97" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
+      <Tabs defaultValue="charts" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsTrigger value="charts">Visual Comparison</TabsTrigger>
+          <TabsTrigger value="radar">Radar Analysis</TabsTrigger>
+          <TabsTrigger value="table">Metrics Table</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="charts" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <ModelComparisonChart metric="r2" />
+            <ModelComparisonChart metric="mae" />
+            <ModelComparisonChart metric="rmse" />
+            <ModelComparisonChart metric="cvR2Mean" />
+          </div>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>RMSE vs R² Score</CardTitle>
+              <CardDescription>
+                Lower RMSE and higher R² indicate better models
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 20, right: 30, bottom: 10, left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    type="number" 
+                    dataKey="rmse" 
+                    name="RMSE"
+                    label={{ value: 'RMSE', position: 'bottom', offset: 0 }} 
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="r2" 
+                    name="R²"
+                    domain={[0, 1]} 
+                    label={{ value: 'R² Score', angle: -90, position: 'left' }} 
+                  />
+                  <ZAxis range={[60, 60]} />
+                  <Tooltip 
+                    formatter={(value: number) => [value.toFixed(3)]} 
+                    cursor={{ strokeDasharray: '3 3' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white p-3 border rounded shadow-lg">
+                            <p className="font-medium">{data.name}</p>
+                            <p>RMSE: {data.rmse.toFixed(2)}</p>
+                            <p>R²: {data.r2.toFixed(3)}</p>
+                            <p>MAE: {data.mae.toFixed(2)}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend />
+                  {getScatterData().map((entry, index) => (
+                    <Scatter 
+                      key={index} 
+                      name={entry.name} 
+                      data={[entry]} 
+                      fill={entry.color} 
+                    />
+                  ))}
+                </ScatterChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="radar">
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Performance Radar</CardTitle>
+              <CardDescription>
+                Higher values indicate better performance on all metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[500px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart outerRadius="80%" data={radarData}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="name" />
+                  <PolarRadiusAxis angle={90} domain={[0, 1]} />
                   
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-md font-medium flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-realestate-accent" />
-                        Price Growth (%)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="chart-container h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={data.growth}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip formatter={(value) => [`${value}%`, "Annual Growth"]} />
-                            <Bar dataKey="value" fill="#f97316" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className={cn("lg:col-span-2")}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-md font-medium">Area Features Comparison</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="chart-container h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart outerRadius={90} data={data.radar}>
-                            <PolarGrid />
-                            <PolarAngleAxis dataKey="subject" />
-                            <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                            <Radar
-                              name={location1}
-                              dataKey={location1}
-                              stroke="#1e5c97"
-                              fill="#1e5c97"
-                              fillOpacity={0.6}
-                            />
-                            <Radar
-                              name={location2}
-                              dataKey={location2}
-                              stroke="#f97316"
-                              fill="#f97316"
-                              fillOpacity={0.6}
-                            />
-                            <Legend />
-                            <Tooltip />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className={cn("lg:col-span-3")}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-md font-medium">Detailed Comparison</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b">
-                              <th className="text-left font-medium p-2">Feature</th>
-                              <th className="text-left font-medium p-2">{location1}</th>
-                              <th className="text-left font-medium p-2">{location2}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-b hover:bg-muted/50">
-                              <td className="p-2">Average Price (₹/sq.ft)</td>
-                              <td className="p-2">₹{locationData[location1 as keyof typeof locationData].avgPrice}</td>
-                              <td className="p-2">₹{locationData[location2 as keyof typeof locationData].avgPrice}</td>
-                            </tr>
-                            <tr className="border-b hover:bg-muted/50">
-                              <td className="p-2">Price Range (₹/sq.ft)</td>
-                              <td className="p-2">₹{locationData[location1 as keyof typeof locationData].priceRange}</td>
-                              <td className="p-2">₹{locationData[location2 as keyof typeof locationData].priceRange}</td>
-                            </tr>
-                            <tr className="border-b hover:bg-muted/50">
-                              <td className="p-2">Annual Growth (%)</td>
-                              <td className="p-2">{locationData[location1 as keyof typeof locationData].growth}%</td>
-                              <td className="p-2">{locationData[location2 as keyof typeof locationData].growth}%</td>
-                            </tr>
-                            <tr className="border-b hover:bg-muted/50">
-                              <td className="p-2">Connectivity Rating</td>
-                              <td className="p-2">{locationData[location1 as keyof typeof locationData].connectivity}/100</td>
-                              <td className="p-2">{locationData[location2 as keyof typeof locationData].connectivity}/100</td>
-                            </tr>
-                            <tr className="border-b hover:bg-muted/50">
-                              <td className="p-2">Amenities Rating</td>
-                              <td className="p-2">{locationData[location1 as keyof typeof locationData].amenities}/100</td>
-                              <td className="p-2">{locationData[location2 as keyof typeof locationData].amenities}/100</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-              
-              {location1 && location2 && location1 === location2 && (
-                <div className="py-8 text-center">
-                  <p className="text-muted-foreground">Please select two different locations to compare</p>
-                </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="property" className="pt-4">
-              <p className="text-center py-8 text-muted-foreground">
-                Property type comparison coming soon! Check back for updates.
-              </p>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                  {["MAE", "RMSE", "R²", "CV R²"].map((dataKey, index) => (
+                    <Radar
+                      key={dataKey}
+                      name={dataKey}
+                      dataKey={dataKey}
+                      stroke={index === 0 ? "#8884d8" : 
+                              index === 1 ? "#82ca9d" : 
+                              index === 2 ? "#ffc658" : "#ff8042"}
+                      fill={index === 0 ? "#8884d8" : 
+                             index === 1 ? "#82ca9d" : 
+                             index === 2 ? "#ffc658" : "#ff8042"}
+                      fillOpacity={0.6}
+                    />
+                  ))}
+                  <Legend />
+                  <Tooltip />
+                </RadarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="table">
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Performance Metrics</CardTitle>
+              <CardDescription>
+                Detailed comparison of all model metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Model</TableHead>
+                    <TableHead>MAE</TableHead>
+                    <TableHead>RMSE</TableHead>
+                    <TableHead>R²</TableHead>
+                    <TableHead>CV R² Mean</TableHead>
+                    <TableHead>CV R² Std</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {modelMetrics.models.map(model => (
+                    <TableRow key={model.name}>
+                      <TableCell className="font-medium">{model.name}</TableCell>
+                      <TableCell>{formatValue(model.mae)}</TableCell>
+                      <TableCell>{formatValue(model.rmse)}</TableCell>
+                      <TableCell>{formatValue(model.r2)}</TableCell>
+                      <TableCell>{formatValue(model.cvR2Mean)}</TableCell>
+                      <TableCell>{formatValue(model.cvR2Std)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

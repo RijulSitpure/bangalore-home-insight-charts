@@ -16,10 +16,11 @@ import {
   Ruler,
   Bed,
   Bath,
-  Car
+  Car,
+  LineChart
 } from "lucide-react";
 import {
-  LineChart,
+  LineChart as RechartsLineChart,
   Line,
   XAxis,
   YAxis,
@@ -28,6 +29,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import ModelComparisonChart from "@/components/ModelComparisonChart";
+import { predictPrice, generatePriceHistory, modelMetrics } from "@/utils/mlModels";
+import { cn } from "@/lib/utils";
 
 const Prediction: React.FC = () => {
   const [area, setArea] = useState<number>(1200);
@@ -36,26 +40,34 @@ const Prediction: React.FC = () => {
   const [bathrooms, setBathrooms] = useState<string>("2");
   const [propertyType, setPropertyType] = useState<string>("");
   const [prediction, setPrediction] = useState<number | null>(null);
+  const [priceHistory, setPriceHistory] = useState<Array<{month: string, price: number}>>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [selectedModel, setSelectedModel] = useState<string>("Random Forest");
   
   const handlePredict = () => {
     setLoading(true);
-    // Simulate API call
+    // Simulate API call with a slight delay
     setTimeout(() => {
-      const basePrice = 6500; // Base price per sq ft
-      const locationFactor = location === "Whitefield" ? 1.2 : 
-                            location === "Electronic City" ? 0.9 :
-                            location === "Indiranagar" ? 1.5 :
-                            location === "Koramangala" ? 1.6 : 1.0;
-      const bedroomFactor = parseInt(bedrooms) * 0.1 + 1;
-      const typeFactor = propertyType === "Apartment" ? 1.0 :
-                       propertyType === "Villa" ? 1.4 :
-                       propertyType === "Independent House" ? 1.2 : 1.0;
-      
-      const predictedPrice = basePrice * locationFactor * bedroomFactor * typeFactor * area;
-      setPrediction(Math.round(predictedPrice / 1000) * 1000); // Round to nearest thousand
-      setLoading(false);
-    }, 1500);
+      try {
+        const predictedPrice = predictPrice(
+          area,
+          location,
+          bedrooms,
+          bathrooms,
+          propertyType,
+          selectedModel
+        );
+        
+        setPrediction(predictedPrice);
+        // Generate price history based on the prediction
+        setPriceHistory(generatePriceHistory(predictedPrice));
+      } catch (error) {
+        console.error("Prediction error:", error);
+        // Handle error gracefully
+      } finally {
+        setLoading(false);
+      }
+    }, 800);
   };
   
   return (
@@ -63,7 +75,7 @@ const Prediction: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Price Prediction</h1>
         <p className="text-muted-foreground">
-          Get an estimated price for your property in Bangalore
+          Get an estimated price for your property in Bangalore using our ML models
         </p>
       </div>
       
@@ -180,6 +192,28 @@ const Prediction: React.FC = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <LineChart className="h-4 w-4 mr-2 text-realestate-primary" />
+                      <Label htmlFor="model">ML Model</Label>
+                    </div>
+                    <Select value={selectedModel} onValueChange={setSelectedModel}>
+                      <SelectTrigger id="model">
+                        <SelectValue placeholder="Select model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modelMetrics.models.map((model) => (
+                          <SelectItem key={model.name} value={model.name}>
+                            {model.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Random Forest is the best performing model based on our evaluations
+                    </p>
                   </div>
                 </TabsContent>
                 <TabsContent value="advanced" className="space-y-4 pt-4">
@@ -299,7 +333,7 @@ const Prediction: React.FC = () => {
                 Predicted Price
               </CardTitle>
               <CardDescription>
-                Based on current market trends
+                Based on {selectedModel} model
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -325,24 +359,15 @@ const Prediction: React.FC = () => {
                   
                   <div className="mt-6 h-40">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={[
-                          { month: "Jan", price: prediction * 0.97 },
-                          { month: "Feb", price: prediction * 0.98 },
-                          { month: "Mar", price: prediction * 0.99 },
-                          { month: "Apr", price: prediction },
-                          { month: "May", price: prediction * 1.01 },
-                          { month: "Jun", price: prediction * 1.02 },
-                        ]}
-                      >
+                      <RechartsLineChart data={priceHistory}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" />
                         <YAxis domain={[(prediction * 0.95), (prediction * 1.05)]} />
                         <Tooltip 
-                          formatter={(value) => [`₹${parseInt(value).toLocaleString()}`, "Estimated Price"]}
+                          formatter={(value) => [`₹${parseInt(String(value)).toLocaleString()}`, "Estimated Price"]}
                         />
                         <Line type="monotone" dataKey="price" stroke="#1e5c97" activeDot={{ r: 8 }} />
-                      </LineChart>
+                      </RechartsLineChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -358,13 +383,19 @@ const Prediction: React.FC = () => {
           </Card>
         </div>
       </div>
+      
+      {/* Model comparison charts section */}
+      {prediction && (
+        <div className="pt-6">
+          <h2 className="text-xl font-semibold mb-4">Model Performance Comparison</h2>
+          <div className="grid gap-6 md:grid-cols-2">
+            <ModelComparisonChart metric="r2" />
+            <ModelComparisonChart metric="mae" />
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-// Helper function to conditionally join class names
-const cn = (...classes: (string | boolean | undefined)[]) => {
-  return classes.filter(Boolean).join(" ");
 };
 
 export default Prediction;
