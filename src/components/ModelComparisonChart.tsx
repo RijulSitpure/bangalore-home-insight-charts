@@ -1,7 +1,6 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import {
   BarChart,
   Bar,
@@ -9,7 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   LabelList,
   ResponsiveContainer
 } from "recharts";
@@ -86,7 +84,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = ({
               />
               <Bar 
                 dataKey={metric} 
-                fill={(entry) => entry.color} 
+                fill={(entry) => entry.color as string} // Fix the type issue here
                 maxBarSize={40}
               >
                 <LabelList 

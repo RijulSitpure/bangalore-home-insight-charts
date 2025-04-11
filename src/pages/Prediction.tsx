@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Calculator,
   MapPin, 
@@ -17,7 +18,8 @@ import {
   Bed,
   Bath,
   Car,
-  LineChart
+  LineChart,
+  Loader2
 } from "lucide-react";
 import {
   LineChart as RechartsLineChart,
@@ -26,48 +28,80 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import ModelComparisonChart from "@/components/ModelComparisonChart";
-import { predictPrice, generatePriceHistory, modelMetrics } from "@/utils/mlModels";
+import { predictPrice, generatePriceHistory, modelMetrics, fetchLocations } from "@/utils/mlModels";
 import { cn } from "@/lib/utils";
 
 const Prediction: React.FC = () => {
+  const { toast } = useToast();
   const [area, setArea] = useState<number>(1200);
   const [location, setLocation] = useState<string>("");
   const [bedrooms, setBedrooms] = useState<string>("2");
   const [bathrooms, setBathrooms] = useState<string>("2");
-  const [propertyType, setPropertyType] = useState<string>("");
+  const [propertyType, setPropertyType] = useState<string>("Apartment");
   const [prediction, setPrediction] = useState<number | null>(null);
   const [priceHistory, setPriceHistory] = useState<Array<{month: string, price: number}>>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [selectedModel, setSelectedModel] = useState<string>("Random Forest");
-  
-  const handlePredict = () => {
-    setLoading(true);
-    // Simulate API call with a slight delay
-    setTimeout(() => {
+  const [predictionError, setPredictionError] = useState<string | null>(null);
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState<boolean>(false);
+
+  // Fetch available locations when component mounts
+  useEffect(() => {
+    const getLocations = async () => {
+      setLocationsLoading(true);
       try {
-        const predictedPrice = predictPrice(
-          area,
-          location,
-          bedrooms,
-          bathrooms,
-          propertyType,
-          selectedModel
-        );
-        
-        setPrediction(predictedPrice);
-        // Generate price history based on the prediction
-        setPriceHistory(generatePriceHistory(predictedPrice));
+        const locations = await fetchLocations();
+        setAvailableLocations(locations);
       } catch (error) {
-        console.error("Prediction error:", error);
-        // Handle error gracefully
+        console.error("Failed to load locations:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load locations. Please check if the API server is running.",
+          variant: "destructive",
+        });
       } finally {
-        setLoading(false);
+        setLocationsLoading(false);
       }
-    }, 800);
+    };
+    
+    getLocations();
+  }, [toast]);
+  
+  const handlePredict = async () => {
+    setLoading(true);
+    setPredictionError(null);
+    
+    try {
+      // Call the API to get prediction
+      const predictedPrice = await predictPrice(
+        area,
+        location,
+        bedrooms,
+        bathrooms
+      );
+      
+      setPrediction(predictedPrice);
+      // Generate price history based on the prediction
+      setPriceHistory(generatePriceHistory(predictedPrice));
+      
+      toast({
+        title: "Prediction Complete",
+        description: `Estimated price: ₹${predictedPrice.toLocaleString()}`,
+      });
+    } catch (error) {
+      console.error("Prediction error:", error);
+      setPredictionError("Failed to get prediction. Please check if the API server is running.");
+      toast({
+        title: "Prediction Error",
+        description: "Failed to get prediction. Please check if the API server is running.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   
   return (
@@ -75,7 +109,7 @@ const Prediction: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Price Prediction</h1>
         <p className="text-muted-foreground">
-          Get an estimated price for your property in Bangalore using our ML models
+          Get an estimated price for your property in Bangalore using our ML model
         </p>
       </div>
       
@@ -104,18 +138,23 @@ const Prediction: React.FC = () => {
                         <MapPin className="h-4 w-4 mr-2 text-realestate-primary" />
                         <Label htmlFor="location">Location</Label>
                       </div>
-                      <Select value={location} onValueChange={setLocation}>
+                      <Select value={location} onValueChange={setLocation} disabled={locationsLoading}>
                         <SelectTrigger id="location">
-                          <SelectValue placeholder="Select location" />
+                          {locationsLoading ? (
+                            <div className="flex items-center">
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Loading locations...
+                            </div>
+                          ) : (
+                            <SelectValue placeholder="Select location" />
+                          )}
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Whitefield">Whitefield</SelectItem>
-                          <SelectItem value="Electronic City">Electronic City</SelectItem>
-                          <SelectItem value="Indiranagar">Indiranagar</SelectItem>
-                          <SelectItem value="Koramangala">Koramangala</SelectItem>
-                          <SelectItem value="Jayanagar">Jayanagar</SelectItem>
-                          <SelectItem value="Marathahalli">Marathahalli</SelectItem>
-                          <SelectItem value="HSR Layout">HSR Layout</SelectItem>
+                          {availableLocations.map(loc => (
+                            <SelectItem key={loc} value={loc}>
+                              {loc}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -192,28 +231,6 @@ const Prediction: React.FC = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <LineChart className="h-4 w-4 mr-2 text-realestate-primary" />
-                      <Label htmlFor="model">ML Model</Label>
-                    </div>
-                    <Select value={selectedModel} onValueChange={setSelectedModel}>
-                      <SelectTrigger id="model">
-                        <SelectValue placeholder="Select model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {modelMetrics.models.map((model) => (
-                          <SelectItem key={model.name} value={model.name}>
-                            {model.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Random Forest is the best performing model based on our evaluations
-                    </p>
                   </div>
                 </TabsContent>
                 <TabsContent value="advanced" className="space-y-4 pt-4">
@@ -309,10 +326,13 @@ const Prediction: React.FC = () => {
                 <Button 
                   className="w-full bg-realestate-primary hover:bg-realestate-primary/90"
                   onClick={handlePredict}
-                  disabled={!location || !propertyType || loading}
+                  disabled={!location || loading}
                 >
                   {loading ? (
-                    "Calculating..."
+                    <div className="flex items-center">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Calculating...
+                    </div>
                   ) : (
                     <>
                       Get Price Prediction
@@ -320,6 +340,12 @@ const Prediction: React.FC = () => {
                     </>
                   )}
                 </Button>
+                
+                {predictionError && (
+                  <div className="mt-2 text-sm text-destructive">
+                    {predictionError}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -333,7 +359,7 @@ const Prediction: React.FC = () => {
                 Predicted Price
               </CardTitle>
               <CardDescription>
-                Based on {selectedModel} model
+                Based on your trained ML model
               </CardDescription>
             </CardHeader>
             <CardContent>
