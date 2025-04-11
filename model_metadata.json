@@ -1,0 +1,1 @@
+{"features": ["location", "total_sqft", "bath", "bhk"], "target": "price", "model_type": "XGBoost", "version": "1.0"}
