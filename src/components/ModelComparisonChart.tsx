@@ -88,9 +88,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = ({ metric }) =
             <Bar 
               dataKey="value" 
               name={metricLabels[metric]}
-              fill="#1e5c97"
               radius={[4, 4, 0, 0]}
-              // Fix: Use a function that returns a string instead of a function itself
               fill={(entry) => entry.color}
             />
           </BarChart>
