@@ -27,7 +27,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     { icon: TrendingUp, name: "Prediction", path: "/prediction" },
     { icon: BarChart3, name: "Comparison", path: "/comparison" },
     { icon: PieChart, name: "Analytics", path: "/analytics" },
-    { icon: Settings, name: "Settings", path: "/settings" },
   ];
 
   const isActive = (path: string) => {

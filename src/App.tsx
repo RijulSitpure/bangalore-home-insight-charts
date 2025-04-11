@@ -13,24 +13,26 @@ import Layout from "./components/Layout";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="prediction" element={<Prediction />} />
-            <Route path="comparison" element={<Comparison />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="prediction" element={<Prediction />} />
+              <Route path="comparison" element={<Comparison />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </TooltipProvider>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+};
 
 export default App;
