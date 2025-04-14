@@ -74,7 +74,7 @@ preprocessor = ColumnTransformer(
         ('num', numeric_transformer, numeric_features),
         ('cat', categorical_transformer, categorical_features)])
 
-# Define models to test
+# Defining models to test
 models = {
     'Linear Regression': LinearRegression(),
     'Lasso': Lasso(alpha=0.1),
@@ -84,7 +84,7 @@ models = {
     'XGBoost': XGBRegressor(n_estimators=100, random_state=42)
 }
 
-# Train and evaluate models
+# Training models
 results = {}
 for name, model in models.items():
     pipeline = Pipeline(steps=[
